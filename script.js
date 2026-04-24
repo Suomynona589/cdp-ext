@@ -1,5 +1,4 @@
 !function (global, factory) {
-  // UMD wrapper like GSAP
   if (typeof exports === "object" && typeof module !== "undefined") {
     factory(exports);
   } else if (typeof define === "function" && define.amd) {
@@ -19,10 +18,7 @@
   // Patch eval so CodePen's JS panel goes through us
   window.eval = function (src) {
     try {
-      // Transform: sleep(123) → await sleep(123)
-      const transformed = src.replace(/sleep\s*\(/g, 'await sleep(');
-
-      // Wrap user code in async IIFE
+      const transformed = src.replace(/(^|[^a-zA-Z0-9_$])sleep\s*\(/g, '$1await sleep(');
       const wrapped = `
         (async () => {
           try {
@@ -32,7 +28,6 @@
           }
         })();
       `;
-
       return originalEval(wrapped);
     } catch (e) {
       console.error("[Extension Error]", e);
