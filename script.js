@@ -1,38 +1,36 @@
-!function (global, factory) {
-  if (typeof exports === "object" && typeof module !== "undefined") {
-    factory(exports);
-  } else if (typeof define === "function" && define.amd) {
-    define(["exports"], factory);
-  } else {
-    factory((global.FixedJS = {}));
-  }
-}(this, function (exports) {
-  "use strict";
+// Make sleep available immediately
+window.sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-  // Make sleep available immediately
-  window.sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+// Save originals
+const _eval = window.eval;
+const _Function = window.Function;
 
-  // Save original eval
-  const originalEval = window.eval;
+// Transform user code
+function transform(src) {
+  return src.replace(/(^|[^a-zA-Z0-9_$])sleep\s*\(/g, '$1await sleep(');
+}
 
-  // Patch eval so CodePen's JS panel goes through us
-  window.eval = function (src) {
-    try {
-      const transformed = src.replace(/(^|[^a-zA-Z0-9_$])sleep\s*\(/g, '$1await sleep(');
-      const wrapped = `
-        (async () => {
-          try {
-            ${transformed}
-          } catch (e) {
-            console.error("[Runtime Error]", e);
-          }
-        })();
-      `;
-      return originalEval(wrapped);
-    } catch (e) {
-      console.error("[Extension Error]", e);
-    }
-  };
+// Patch eval
+window.eval = function (src) {
+  const wrapped = `
+    (async () => {
+      try {
+        ${transform(src)}
+      } catch (e) {
+        console.error("[Runtime Error]", e);
+      }
+    })();
+  `;
+  return _eval(wrapped);
+};
 
-  exports.sleep = window.sleep;
-});
+// Patch Function constructor (CodePen uses this)
+window.Function = function (...args) {
+  const body = args.pop();
+  const wrapped = transform(body);
+  return _Function(...args, `
+    (async () => {
+      ${wrapped}
+    })();
+  `);
+};
